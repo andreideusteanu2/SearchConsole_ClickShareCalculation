@@ -29,7 +29,7 @@ def readPrepare_inputData(queriesFile,pathFiles):
     #add the index as an unique query identifier
     #by default it's added at the end of the data frame
     #remove multiple spaces in keyword
-    inputData["Keyword"]=inputData["Keyword"].apply(lambda x: " ".join(x.split(' ')))
+    inputData["Keyword"]=inputData["Keyword"].apply(lambda x: " ".join(x.split()))
     #count the number of words in keyword
     inputData["wordCount"]=inputData["Keyword"].str.count(" ")+1
     return inputData
@@ -37,7 +37,7 @@ def readPrepare_inputData(queriesFile,pathFiles):
 def importData_byCountry(countryCode):
     from os import listdir
 
-    sites=raw_input('Enter sites url without domains:')
+    sites=['https://www.emag.','https://m.emag.']
     for i,site in enumerate(sites):
         sites[i]=site+countryCode.lower()
     countryFullData=pd.DataFrame()
@@ -185,8 +185,8 @@ def getSearchConsole_Data(searchQueriesData,sites,startDate,endDate):
           
     #initialize the connector to Google API
     service, flags = sample_tools.init(
-        ['SearchConsole_ByTermQuery_BigQuery_DataTransfer.py']
-        , 'webmasters', 'v3', __doc__, pathFiles+'SearchConsole_ByTermQuery_BigQuery_DataTransfer.py',
+        [__file__]
+        , 'webmasters', 'v3', __doc__,__file__,
         scope='https://www.googleapis.com/auth/webmasters.readonly')
     #define URLs for which data is requested    
     #define site properties
@@ -249,34 +249,23 @@ def getSearchConsole_Data(searchQueriesData,sites,startDate,endDate):
     
     return table_full
 
-def getSearchConsoleData_forCountry(countryCodes,startDate,endDate):
+def getSearchConsoleData_forCountries(countryCodes,startDate,endDate):
     global pd, pathFiles
     pathFiles='\\\\emag.local\\HQ\\Platforms\\02_Mobile_Web\\Tracking & Analytics\\Search Console Data\\'
     import pandas as pd
     table_full=pd.DataFrame()
-    if isinstance(countryCodes,str):
-        country=countryCodes
+    countryCodes=countryCodes.strip().split(",")
+    for country in countryCodes:
         buf=importData_byCountry(country)
         sites=buf[0]
         searchQueriesData=buf[1]
         del(buf)
         table_full=getSearchConsole_Data(searchQueriesData,sites,startDate,endDate)
-    elif isinstance(countryCodes,list):
-        for country in countryCodes:
-            buf=importData_byCountry(country)
-            sites=buf[0]
-            searchQueriesData=buf[1]
-            del(buf)
-            table_full=getSearchConsole_Data(searchQueriesData,sites,startDate,endDate)
     #write the data in a csv file
     csvName=pathFiles+country+"\\"+"OUTPUT_searchTermsData_"+startDate+"_"+endDate+".csv"
-    table_full.to_csv(csvName,index=False)
+    table_full.to_csv(csvName,index=False,encoding='utf-8')
     return csvName
     
-countryCodes="RO"
-startDate="2017-09-13"
-endDate="2017-09-20"
-
 from google.cloud import bigquery
 bigquery_client = bigquery.Client(project='emagbigquery')
 dataset_name = 'SearchConsoleData'
@@ -301,10 +290,20 @@ def uploadFileToBQ(sourceFile):
         job=table.upload_from_file(source_file,source_format='text/csv'
                                ,skip_leading_rows=1)
         wait_for_job(job)
+        
+import argparse
 
-csvName=getSearchConsoleData_forCountry("RO","2017-09-13","2017-09-20")
+argparser=argparse.ArgumentParser(add_help=False)
+argparser.add_argument('countryCodes',type=str,help=('Country(ies) to download the data for'))
+argparser.add_argument('startDate',type=str,help=('Start date of the requested date range in '
+                             'YYYY-MM-DD format'))
+argparser.add_argument('endDate',type=str,help=('End date of the requested date range in '
+                             'YYYY-MM-DD format'))
+
+from os import remove
+args=argparser.parse_args()
+csvName=getSearchConsoleData_forCountries(args.countryCodes,args.startDate,args.endDate)
 uploadFileToBQ(csvName)
 #remove(csvName)
-
 
 
