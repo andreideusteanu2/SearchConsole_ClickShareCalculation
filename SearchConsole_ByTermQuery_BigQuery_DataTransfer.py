@@ -37,7 +37,7 @@ def readPrepare_inputData(queriesFile,pathFiles):
 def importData_byCountry(countryCode):
     from os import listdir
 
-    sites=['https://www.emag.','https://m.emag.']
+    sites=raw_input('Enter sites url without domains:')
     for i,site in enumerate(sites):
         sites[i]=site+countryCode.lower()
     countryFullData=pd.DataFrame()
